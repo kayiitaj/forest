@@ -125,6 +125,28 @@
     .down { color:var(--down); }
     .neut { color:var(--muted2); }
 
+    /* ROW MENU (... on home rows) */
+    .row-menu-wrap { position:relative; margin-left:4px; }
+    .row-menu-btn {
+      background:none; border:none; color:var(--muted); cursor:pointer;
+      font-size:1.1rem; padding:2px 8px; line-height:1; letter-spacing:2px;
+    }
+    .row-menu-btn:hover { color:var(--white); }
+    .row-menu {
+      display:none; position:absolute; right:0; top:100%; z-index:60;
+      background:var(--surface); border:1px solid var(--border2); border-radius:2px;
+      min-width:140px; overflow:hidden;
+    }
+    .row-menu.open { display:block; }
+    .row-menu-item {
+      display:block; width:100%; text-align:left; padding:10px 14px;
+      font-family:var(--font); font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase;
+      color:var(--muted2); background:none; border:none; cursor:pointer;
+    }
+    .row-menu-item:hover { color:var(--white); background:var(--surface2); }
+    .row-menu-item.danger { color:var(--down); }
+    .row-menu-item.danger:hover { background:rgba(192,57,43,0.12); }
+
     /* HOLDING ROW */
     .hrow {
       display:flex; padding:14px 16px; border-bottom:1px solid var(--border);
@@ -532,25 +554,32 @@ async function fetchQuote(ticker) {
   return j;
 }
 
+let _refreshing = false;
 async function refreshQuotes(showToast = false) {
+  if (_refreshing) return;            // guard against overlapping refreshes
   const tickers = [...new Set(S.investments
     .filter(i => i.kind === 'public' && i.ticker)
     .map(i => i.ticker.toUpperCase()))];
   if (!tickers.length) { render(); return; }
 
+  _refreshing = true;
   const btn = document.getElementById('refreshBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
-
-  const results = await Promise.all(tickers.map(async t => {
-    try { return [t, await fetchQuote(t)]; }
-    catch (e) { return [t, null]; }
-  }));
-  results.forEach(([t, q]) => { if (q) S.quotes[t] = q; });
-  S.quoteStamp = new Date();
-
-  if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
-  render();
-  if (showToast) toast('Quotes refreshed', 'ok');
+  try {
+    const results = await Promise.all(tickers.map(async t => {
+      try { return [t, await fetchQuote(t)]; }
+      catch { return [t, null]; }
+    }));
+    results.forEach(([t, q]) => { if (q) S.quotes[t] = q; });
+    S.quoteStamp = new Date();
+    render();
+    if (showToast) toast('Quotes refreshed', 'ok');
+  } catch (e) {
+    if (showToast) toast('Refresh error: ' + e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+    _refreshing = false;
+  }
 }
 
 function startAutoRefresh() {
@@ -563,6 +592,19 @@ function stopAutoRefresh() {
   if (_refreshTimer) clearInterval(_refreshTimer);
   _refreshTimer = null;
 }
+
+// Refresh immediately when the tab becomes visible — avoids staring at stale
+// numbers for up to 5 minutes after coming back. Debounced to 30s so quick
+// tab-switching doesn't spam Finnhub.
+let _lastVisibilityRefresh = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!S.user) return;
+  const now = Date.now();
+  if (now - _lastVisibilityRefresh < 30 * 1000) return;
+  _lastVisibilityRefresh = now;
+  refreshQuotes(false);
+});
 
 // ══════════════════════════════════════════════════════════
 // METRICS
@@ -705,6 +747,12 @@ function gainRowHTML(inv, m) {
       <div class="hrow-right">
         <div class="hrow-big ${cls}">${fmtSigned$(m.gain)}</div>
         <div class="hrow-chg ${cls}">${fmtPct(m.gain_pct)}</div>
+      </div>
+      <div class="row-menu-wrap">
+        <button class="row-menu-btn" onclick="toggleRowMenu('${inv.id}', event)">...</button>
+        <div class="row-menu" id="rmenu-${inv.id}">
+          <button class="row-menu-item danger" onclick="deleteHolding('${inv.id}', event)">Delete</button>
+        </div>
       </div>
     </div>
   `;
@@ -1198,6 +1246,41 @@ async function saveInvestEvent() {
 }
 
 // ══════════════════════════════════════════════════════════
+// DELETE HOLDING — ... menu on home rows (loadout pattern)
+// ══════════════════════════════════════════════════════════
+let _openMenu = null;
+function toggleRowMenu(id, evt) {
+  if (evt) evt.stopPropagation();
+  const menu = document.getElementById('rmenu-' + id);
+  if (!menu) return;
+  if (_openMenu && _openMenu !== menu) _openMenu.classList.remove('open');
+  menu.classList.toggle('open');
+  _openMenu = menu.classList.contains('open') ? menu : null;
+}
+document.addEventListener('click', () => {
+  if (_openMenu) { _openMenu.classList.remove('open'); _openMenu = null; }
+});
+
+async function deleteHolding(id, evt) {
+  if (evt) evt.stopPropagation();
+  if (_openMenu) { _openMenu.classList.remove('open'); _openMenu = null; }
+  const inv = S.investments.find(i => i.id === id);
+  if (!inv) return;
+  const label = inv.kind === 'public' ? (inv.ticker || 'holding') : (inv.name || 'holding');
+  if (!confirm(`Delete ${label}? All lots and valuations will be removed. This cannot be undone.`)) return;
+  await withLoading(async () => {
+    const { error } = await sb.from('investments').delete().eq('id', id);
+    if (error) throw error;
+    S.investments = S.investments.filter(i => i.id !== id);
+    S.lots        = S.lots.filter(l => l.investment_id !== id);
+    S.valuations  = S.valuations.filter(v => v.investment_id !== id);
+    render();
+    if (S.activeId === id) closeDetail();
+    toast('Deleted', 'ok');
+  }, 'Deleting...').catch(e => toast('Error: ' + e.message, 'err'));
+}
+
+// ══════════════════════════════════════════════════════════
 // UI HELPERS
 // ══════════════════════════════════════════════════════════
 function show(id) {
@@ -1267,26 +1350,48 @@ async function enterApp() {
   startAutoRefresh();
 }
 
+// Surface auth errors that come back in the redirect URL after a magic link
+// fails (expired, already used, etc). Supabase puts them in the hash fragment.
+function surfaceRedirectAuthError() {
+  const hash = window.location.hash || '';
+  const m = hash.match(/error_description=([^&]+)/);
+  if (!m) return;
+  const msg = decodeURIComponent(m[1]).replace(/\+/g, ' ');
+  const el = document.getElementById('loginMsg');
+  if (el) el.innerHTML = `<span style="color:var(--down)">${escapeHTML(msg)}</span>`;
+  history.replaceState({}, '', window.location.pathname + window.location.search);
+}
+
 (async () => {
   showLoading('Loading...');
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) {
-    S.user = session.user;
-    try { await enterApp(); }
-    catch (e) { toast('Load error: ' + e.message, 'err'); }
-    hideLoading();
-  } else {
-    hideLoading();
+  try {
+    const { data: { session }, error } = await sb.auth.getSession();
+    if (error) throw error;
+    if (session?.user) {
+      S.user = session.user;
+      await enterApp();
+    } else {
+      surfaceRedirectAuthError();
+      show('s-login');
+    }
+  } catch (e) {
+    toast('Load error: ' + e.message, 'err');
     show('s-login');
+  } finally {
+    hideLoading();
   }
 
   sb.auth.onAuthStateChange(async (event, session) => {
     if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
       showLoading('Loading...');
-      S.user = session.user;
-      try { await enterApp(); }
-      catch (e) { toast('Load error: ' + e.message, 'err'); }
-      hideLoading();
+      try {
+        S.user = session.user;
+        await enterApp();
+      } catch (e) {
+        toast('Load error: ' + e.message, 'err');
+      } finally {
+        hideLoading();
+      }
     }
     if (event === 'SIGNED_OUT') { show('s-login'); }
   });
