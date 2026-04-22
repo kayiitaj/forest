@@ -14,7 +14,7 @@ I was tired of stitching my portfolio together across a brokerage app, a notes f
 
 **Detail page** — tap any holding. For public stocks: ticker, current price vs average cost basis, shares, total cost, current value, gain $/%, today's change, and every lot you bought. For private investments: total invested, latest valuation, gain $/%, the timeline of valuation rounds, and every invest event.
 
-**Add flow** — toggle Public or Private. Public takes a pasted table (Ticker, Shares, Cost, Date), tab- or comma-separated, one row per lot. Private takes a single form.
+**Add flow** — toggle Public or Private. Public takes a pasted table (Ticker, Shares, Cost, Date), tab- or comma-separated, one row per lot. Or upload a holdings PDF from **Morgan Stanley**, **Fidelity**, **Schwab**, or **Robinhood** and Forest will parse your positions into draft rows for you to review. Private takes a single form.
 
 **Live quotes** — Finnhub under the hood. Manual refresh button plus auto-refresh every 5 minutes while the tab is open.
 

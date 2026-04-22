@@ -7,6 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
   <style>
     :root {
       --bg:       #0a0f0a;
@@ -314,8 +315,16 @@
 
       <!-- PUBLIC PASTE -->
       <div id="addPublic" style="padding:0 16px">
-        <div class="tiny" style="margin-bottom:6px">
-          Paste rows. Columns: <strong>Ticker</strong>, <strong>Shares</strong>, <strong>Cost/share</strong>, <strong>Date (YYYY-MM-DD)</strong>. Tab or comma separated. One row per lot — repeated tickers get grouped.
+        <div class="tiny" style="margin-bottom:8px;line-height:1.7">
+          Upload a holdings PDF from <strong>Morgan Stanley</strong>, <strong>Fidelity</strong>, <strong>Schwab</strong>, or <strong>Robinhood</strong> — we'll parse tickers, shares, and cost basis into the rows below. Or paste manually.
+        </div>
+        <div class="field">
+          <label>Upload Statement PDF (optional)</label>
+          <input class="finput" type="file" id="pdfFile" accept="application/pdf" onchange="handlePDFUpload(event)"/>
+          <div class="tiny" id="pdfStatus" style="margin-top:6px;line-height:1.6"></div>
+        </div>
+        <div class="tiny" style="margin:10px 0 6px">
+          Columns: <strong>Ticker</strong>, <strong>Shares</strong>, <strong>Cost/share</strong>, <strong>Date (YYYY-MM-DD)</strong>. Tab or comma separated. Repeated tickers get grouped.
         </div>
         <div class="field">
           <label>Rows</label>
@@ -450,6 +459,12 @@ const SUPA_KEY    = 'sb_publishable_SDxv5niCCk0h6aVhMpd6Rw_LrGsUMwL'; // anon / 
 const FINNHUB_KEY = 'd7khhgpr01qiqbcudoo0d7khhgpr01qiqbcudoog';
 
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// pdf.js worker — required for getDocument() to work
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
+}
 
 // ══════════════════════════════════════════════════════════
 // STATE
@@ -861,6 +876,155 @@ function parsePasteTable(text) {
     rows.push({ ticker, shares, cost_per_share: cost, purchase_date: dateStr });
   });
   return { rows, errors };
+}
+
+// ══════════════════════════════════════════════════════════
+// PDF UPLOAD — parse holdings from broker statements
+// ══════════════════════════════════════════════════════════
+async function handlePDFUpload(evt) {
+  const file = evt.target.files?.[0];
+  if (!file) return;
+  const statusEl = document.getElementById('pdfStatus');
+  statusEl.innerHTML = '<span class="spin"></span>Parsing PDF...';
+  try {
+    if (!window.pdfjsLib) throw new Error('pdf.js failed to load');
+    const { broker, rows } = await parseBrokerPDF(file);
+    if (!rows.length) {
+      statusEl.innerHTML = `<span class="warn">No positions found. Detected broker: ${broker}. Try pasting rows manually.</span>`;
+      return;
+    }
+    const date = todayISO();
+    const lines = rows.map(r =>
+      `${r.ticker}, ${r.shares}, ${(+r.cost_per_share).toFixed(6)}, ${date}`
+    );
+    const box = document.getElementById('pasteBox');
+    const prev = box.value.trim();
+    box.value = (prev ? prev + '\n' : '') + lines.join('\n');
+    const label = { 'morgan-stanley':'Morgan Stanley', fidelity:'Fidelity',
+                    schwab:'Schwab', robinhood:'Robinhood', unknown:'unknown format' }[broker];
+    statusEl.innerHTML = `<span class="up">Found ${rows.length} position${rows.length===1?'':'s'} (${label}).</span> Review below — edit purchase dates, then Save.`;
+  } catch (err) {
+    statusEl.innerHTML = `<span class="warn">Parse error: ${err.message}</span>`;
+  } finally {
+    evt.target.value = '';
+  }
+}
+
+async function parseBrokerPDF(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let flat = '';
+  const allRows = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    flat += content.items.map(it => it.str).join(' ') + '\n';
+    const byY = {};
+    content.items.forEach(it => {
+      const y = Math.round(it.transform[5] * 2) / 2;
+      (byY[y] ||= []).push({ x: it.transform[4], str: it.str.trim() });
+    });
+    Object.entries(byY)
+      .sort((a, b) => Number(b[0]) - Number(a[0]))
+      .forEach(([, items]) => {
+        const cells = items.sort((a, b) => a.x - b.x).map(i => i.str).filter(Boolean);
+        if (cells.length) allRows.push(cells);
+      });
+  }
+  const broker = detectBroker(flat);
+  let rows = [];
+  if (broker === 'morgan-stanley') rows = parseMorganStanley(flat);
+  if (!rows.length)                rows = parseGenericRows(allRows);
+  return { broker, rows };
+}
+
+function detectBroker(flat) {
+  const s = flat.toLowerCase();
+  if (s.includes('morgan stanley')) return 'morgan-stanley';
+  if (s.includes('fidelity'))       return 'fidelity';
+  if (s.includes('charles schwab') || /\bschwab\b/.test(s)) return 'schwab';
+  if (s.includes('robinhood'))      return 'robinhood';
+  return 'unknown';
+}
+
+function cleanNum(s) {
+  const n = Number(String(s).replace(/[,\s$]/g, '').replace(/−/g, '-'));
+  return Number.isFinite(n) ? n : NaN;
+}
+
+const TICKER_BLACKLIST = new Set([
+  'TOTAL','CASH','USD','NAME','DATE','GAIN','LOSS','COST','TYPE','DIV','DAY',
+  'AM','PM','ETF','IRS','NA','BDPS','INC','CORP','LLC','LTD','PLC','SHS','ADR',
+  'IRA','YTD','MTD','SEC','SIPC','FDIC','CUSIP','USA'
+]);
+function isTicker(s) {
+  if (!/^[A-Z]{1,5}(?:\.[A-Z])?$/.test(s)) return false;
+  return !TICKER_BLACKLIST.has(s);
+}
+
+// Morgan Stanley — flat text regex (layout is consistent enough to grab precisely)
+function parseMorganStanley(flat) {
+  // TICKER CUSIP price hh:mm AM/PM qty mktVal ±$chg ±pct% unitCost totalCost ±$gain ±pct%
+  const RE = /\b([A-Z]{1,5}(?:\.[A-Z])?)\s+[0-9A-Z]{8,9}\s+[\d.,]+\s+\d{1,2}:\d{2}\s*(?:AM|PM)\s+([\d,]+\.?\d*)\s+[\d,]+\.\d{2}\s+[+\-−]\$?[\d,.]+\s+[+\-−]?\d+\.\d+%\s+([\d,]+\.\d+)\s+([\d,]+\.\d{2})/g;
+  const rows = [];
+  const seen = new Set();
+  let m;
+  while ((m = RE.exec(flat)) !== null) {
+    const [, ticker, qStr, , tStr] = m;
+    if (seen.has(ticker)) continue;
+    const shares = cleanNum(qStr);
+    const total  = cleanNum(tStr);
+    if (!shares || !total) continue;
+    seen.add(ticker);
+    rows.push({ ticker, shares, cost_per_share: total / shares });
+  }
+  return rows;
+}
+
+// Generic row-scanner — works for Fidelity, Schwab, Robinhood, anything with
+// a ticker + (shares, unit-cost, total-cost) triple in a single visual row.
+function parseGenericRows(allRows) {
+  const out = [];
+  const seen = new Set();
+  for (const cells of allRows) {
+    const tickIdx = cells.findIndex(c => isTicker(c));
+    if (tickIdx < 0 || tickIdx > 3) continue;
+    const ticker = cells[tickIdx];
+    if (seen.has(ticker)) continue;
+
+    const nums = cells.map((c, i) => ({ i, s: c, n: cleanNum(c) }))
+      .filter(x => Number.isFinite(x.n) && x.n > 0 && !isTicker(x.s));
+    if (nums.length < 2) continue;
+
+    // Find triples (shares, unit, total) where shares × unit ≈ total.
+    // Prefer the rightmost triple (brokers typically put cost-basis to the right
+    // of market-value, so we avoid accidentally matching market-value columns).
+    const triples = [];
+    for (let a = 0; a < nums.length; a++) {
+      for (let b = 0; b < nums.length; b++) {
+        for (let c = 0; c < nums.length; c++) {
+          if (a === b || b === c || a === c) continue;
+          const shares = nums[a].n, unit = nums[b].n, total = nums[c].n;
+          if (shares < 0.001 || shares > 1e7) continue;
+          if (unit <= 0 || unit > 1e5) continue;
+          if (total < 1 || total > 1e8) continue;
+          const diff = Math.abs(shares * unit - total) / total;
+          if (diff > 0.005) continue;
+          triples.push({
+            shares, unit, total,
+            rightness: nums[a].i + nums[b].i + nums[c].i,
+            diff,
+          });
+        }
+      }
+    }
+    if (!triples.length) continue;
+    triples.sort((a, b) => b.rightness - a.rightness || a.diff - b.diff);
+    const best = triples[0];
+    seen.add(ticker);
+    out.push({ ticker, shares: best.shares, cost_per_share: best.total / best.shares });
+  }
+  return out;
 }
 
 async function submitPaste() {
