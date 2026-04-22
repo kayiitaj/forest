@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>FOREST</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg:       #0a0f0a;
+      --surface:  #121712;
+      --surface2: #1a201a;
+      --border:   #243024;
+      --border2:  #33422f;
+      --green:    #4caf7f;
+      --green-lo: #25563f;
+      --white:    #e6e6e6;
+      --muted:    #5a6b5a;
+      --muted2:   #8a9a8a;
+      --up:       #4caf7f;
+      --down:     #c0392b;
+      --font:     'IBM Plex Mono', monospace;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { background:var(--bg); color:var(--white); font-family:var(--font); min-height:100dvh; font-size:13px; overscroll-behavior:none; }
+
+    /* SCREENS */
+    .screen { display:none; min-height:100dvh; flex-direction:column; }
+    .screen.active { display:flex; }
+
+    /* CENTERED */
+    .centered { flex:1; display:flex; flex-direction:column; justify-content:center; padding:40px 24px; max-width:420px; margin:0 auto; width:100%; }
+    .c-logo { font-size:1.5rem; font-weight:600; letter-spacing:0.26em; color:var(--green); margin-bottom:4px; }
+    .c-sub  { font-size:0.65rem; color:var(--muted); letter-spacing:0.1em; margin-bottom:32px; line-height:1.7; }
+    .c-title{ font-size:0.65rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--white); margin-bottom:16px; }
+
+    /* APP HEADER */
+    .app-header {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:16px 16px 12px; border-bottom:1px solid var(--border);
+      max-width:480px; margin:0 auto; width:100%;
+    }
+    .logo { font-size:0.95rem; font-weight:600; letter-spacing:0.24em; color:var(--green); }
+    .hdr-right { font-size:0.6rem; color:var(--muted); letter-spacing:0.08em; cursor:pointer; display:flex; align-items:center; gap:10px; }
+    .hdr-right:hover { color:var(--white); }
+    .hdr-action { background:none; border:none; font-family:var(--font); font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); cursor:pointer; padding:4px 6px; }
+    .hdr-action:hover { color:var(--green); }
+
+    /* PANE */
+    .pane { flex:1; overflow-y:auto; padding-bottom:90px; }
+    .pane-inner { max-width:480px; margin:0 auto; width:100%; }
+
+    /* SECTION LABEL */
+    .slabel {
+      font-size:0.56rem; letter-spacing:0.22em; text-transform:uppercase;
+      color:var(--muted); padding:13px 16px 8px; border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .slabel-right { color:var(--muted2); letter-spacing:0.08em; text-transform:none; font-size:0.58rem; }
+
+    /* FIELDS */
+    .field { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+    .field label, .flabel { font-size:0.56rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); }
+    .finput {
+      background:var(--surface2); border:1px solid var(--border2);
+      color:var(--white); font-family:var(--font); font-size:0.9rem;
+      padding:10px; border-radius:2px; outline:none; width:100%;
+      transition:border-color 0.15s; -webkit-appearance:none;
+    }
+    .finput:focus { border-color:var(--green); }
+    .finput::placeholder { color:var(--muted); font-weight:300; }
+    .finput.upper { text-transform:uppercase; letter-spacing:0.05em; }
+    textarea.finput { resize:none; font-size:0.78rem; line-height:1.5; }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+
+    /* BUTTONS */
+    .btn {
+      font-family:var(--font); font-size:0.65rem; font-weight:500;
+      letter-spacing:0.14em; text-transform:uppercase;
+      border:none; border-radius:2px; padding:12px 16px; cursor:pointer; transition:opacity 0.15s;
+    }
+    .btn:active { opacity:0.7; }
+    .btn-primary { background:var(--green); color:#0a0f0a; width:100%; }
+    .btn-primary:disabled { background:var(--green-lo); color:#555; cursor:not-allowed; }
+    .btn-ghost { background:none; border:1px solid var(--border2); color:var(--muted); }
+    .btn-ghost:hover { color:var(--white); border-color:var(--muted); }
+    .btn-full { width:100%; }
+    .btn-sm { font-size:0.58rem; padding:8px 12px; }
+
+    /* BOTTOM TAB NAV */
+    .tabnav {
+      position:fixed; bottom:0; left:0; right:0; z-index:50;
+      background:var(--bg); border-top:1px solid var(--border);
+    }
+    .tabnav-inner { display:flex; max-width:480px; margin:0 auto; }
+    .tab-btn {
+      flex:1; padding:14px 0 16px; font-family:var(--font); font-size:0.6rem;
+      letter-spacing:0.18em; text-transform:uppercase; color:var(--muted);
+      background:none; border:none; cursor:pointer;
+      border-top:2px solid transparent; margin-top:-1px;
+    }
+    .tab-btn.active { color:var(--green); border-top-color:var(--green); }
+
+    /* SUMMARY TILES */
+    .sum-wrap { padding:14px 16px 6px; }
+    .sum-hero {
+      border:1px solid var(--border); border-radius:3px; padding:16px;
+      background:var(--surface); margin-bottom:10px;
+    }
+    .sum-label { font-size:0.54rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+    .sum-big   { font-size:1.6rem; font-weight:500; letter-spacing:0.02em; }
+    .sum-sub   { font-size:0.72rem; color:var(--muted2); margin-top:4px; }
+    .sum-row2  { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .sum-tile  {
+      border:1px solid var(--border); border-radius:3px; padding:12px 14px;
+      background:var(--surface);
+    }
+    .sum-tile .sum-big { font-size:1.05rem; }
+
+    .up   { color:var(--up); }
+    .down { color:var(--down); }
+    .neut { color:var(--muted2); }
+
+    /* HOLDING ROW */
+    .hrow {
+      display:flex; padding:12px 16px; border-bottom:1px solid var(--border);
+      cursor:pointer; gap:10px; align-items:center;
+    }
+    .hrow:hover { background:var(--surface); }
+    .hrow-left { flex:1; min-width:0; }
+    .hrow-top  { display:flex; align-items:baseline; gap:8px; }
+    .hrow-tick { font-size:0.85rem; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; }
+    .hrow-name { font-size:0.62rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hrow-meta { font-size:0.6rem; color:var(--muted2); margin-top:2px; }
+    .hrow-right { text-align:right; }
+    .hrow-val   { font-size:0.85rem; font-weight:500; }
+    .hrow-chg   { font-size:0.6rem; margin-top:2px; }
+    .kind-pill  {
+      display:inline-block; font-size:0.5rem; letter-spacing:0.14em; text-transform:uppercase;
+      color:var(--muted2); border:1px solid var(--border2); padding:1px 5px; border-radius:1px;
+      vertical-align:middle;
+    }
+    .kind-pill.priv { color:var(--green); border-color:var(--green-lo); }
+
+    /* ADD SCREEN */
+    .kind-toggle {
+      display:flex; gap:0; border:1px solid var(--border2); border-radius:2px;
+      margin:14px 16px; overflow:hidden;
+    }
+    .kind-btn {
+      flex:1; padding:10px; font-family:var(--font); font-size:0.6rem;
+      letter-spacing:0.16em; text-transform:uppercase;
+      background:none; border:none; color:var(--muted); cursor:pointer;
+    }
+    .kind-btn.active { background:var(--green); color:#0a0f0a; }
+
+    /* DETAIL PAGE */
+    .detail-hero {
+      padding:16px; border-bottom:1px solid var(--border);
+    }
+    .detail-row {
+      display:flex; justify-content:space-between; padding:10px 16px;
+      border-bottom:1px solid var(--border); font-size:0.72rem;
+    }
+    .detail-row .k { color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; font-size:0.56rem; }
+    .detail-row .v { color:var(--white); text-align:right; }
+
+    /* LOT / VALUATION ROW */
+    .ltable { padding:4px 0; }
+    .lrow {
+      display:flex; padding:10px 16px; border-bottom:1px solid var(--border);
+      font-size:0.7rem; align-items:baseline; gap:8px;
+    }
+    .lrow:last-child { border-bottom:none; }
+    .lrow-date { color:var(--muted); font-size:0.6rem; min-width:82px; }
+    .lrow-mid  { flex:1; color:var(--white); }
+    .lrow-right{ color:var(--muted2); text-align:right; }
+    .lrow-note { font-size:0.58rem; color:var(--muted); margin-top:2px; line-height:1.4; }
+
+    /* MODAL */
+    .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100; align-items:flex-end; justify-content:center; }
+    .overlay.open { display:flex; }
+    .modal {
+      background:var(--surface); border-top:1px solid var(--border2);
+      width:100%; max-width:480px; padding:20px 16px 36px;
+      border-radius:4px 4px 0 0; max-height:90dvh; overflow-y:auto;
+    }
+    .modal-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .modal-title { font-size:0.65rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--green); }
+    .modal-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.1rem; line-height:1; }
+    .divider { height:1px; background:var(--border); margin:14px 0; }
+
+    /* TOAST */
+    .toast {
+      position:fixed; top:16px; left:50%;
+      transform:translateX(-50%) translateY(-80px);
+      background:var(--surface); border:1px solid var(--border2);
+      color:var(--white); font-family:var(--font); font-size:0.66rem;
+      letter-spacing:0.06em; padding:10px 18px; border-radius:2px;
+      transition:transform 0.22s ease; z-index:300; white-space:nowrap;
+    }
+    .toast.show { transform:translateX(-50%) translateY(0); }
+    .toast.ok  { border-color:var(--green); color:var(--green); }
+    .toast.err { border-color:var(--down);  color:var(--down); }
+
+    /* SPINNER */
+    .spin {
+      display:inline-block; width:10px; height:10px;
+      border:2px solid var(--border2); border-top-color:var(--green);
+      border-radius:50%; animation:_spin 0.7s linear infinite;
+      margin-right:6px; vertical-align:middle;
+    }
+    @keyframes _spin { to { transform:rotate(360deg); } }
+
+    /* LOADING OVERLAY */
+    .loading-overlay {
+      display:none; position:fixed; inset:0; background:rgba(10,15,10,0.72);
+      z-index:400; align-items:center; justify-content:center; flex-direction:column; gap:12px;
+    }
+    .loading-overlay.active { display:flex; }
+    .loading-spinner {
+      width:28px; height:28px; border:3px solid var(--border2); border-top-color:var(--green);
+      border-radius:50%; animation:_spin 0.7s linear infinite;
+    }
+    .loading-text { font-size:0.6rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted2); }
+
+    .empty { padding:28px 16px; font-size:0.68rem; color:var(--muted); letter-spacing:0.06em; text-align:center; }
+    .gap   { height:100px; }
+    .mt8   { margin-top:8px; }
+    .mt12  { margin-top:12px; }
+    .mb0   { margin-bottom:0 !important; }
+    .tiny  { font-size:0.56rem; color:var(--muted); letter-spacing:0.1em; }
+    .warn  { color:var(--down); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════ LOGIN ══════════════════ -->
+<div class="screen active" id="s-login">
+  <div class="centered">
+    <div class="c-logo">FOREST</div>
+    <div class="c-sub">Live portfolio.<br>Public stocks and private bets.</div>
+    <div class="c-title">Sign in</div>
+    <div class="field">
+      <label>Email</label>
+      <input class="finput" type="email" id="loginEmail" placeholder="you@email.com" inputmode="email" autocomplete="email"/>
+    </div>
+    <button class="btn btn-primary mt8" id="btnMagic" onclick="sendMagicLink()">Send Magic Link →</button>
+    <div style="margin-top:14px;font-size:0.6rem;color:var(--muted);line-height:1.7" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ APP ══════════════════ -->
+<div class="screen" id="s-app">
+  <div class="app-header">
+    <span class="logo">FOREST</span>
+    <span class="hdr-right">
+      <button class="hdr-action" id="refreshBtn" onclick="refreshQuotes(true)">Refresh</button>
+      <span id="hdrUser" onclick="openModal('m-profile')">—</span>
+    </span>
+  </div>
+
+  <!-- SUMMARY PANE -->
+  <div class="pane" id="pane-summary">
+    <div class="pane-inner">
+      <div class="sum-wrap">
+        <div class="sum-hero">
+          <div class="sum-label">Current Value</div>
+          <div class="sum-big" id="sumValue">$0.00</div>
+          <div class="sum-sub" id="sumInvested">Invested: $0.00</div>
+        </div>
+        <div class="sum-row2">
+          <div class="sum-tile">
+            <div class="sum-label">Total Earnings</div>
+            <div class="sum-big" id="sumEarn">$0.00</div>
+            <div class="sum-sub" id="sumEarnPct">+0.00%</div>
+          </div>
+          <div class="sum-tile">
+            <div class="sum-label">Today's Change</div>
+            <div class="sum-big" id="sumToday">$0.00</div>
+            <div class="sum-sub" id="sumTodayPct">+0.00%</div>
+          </div>
+        </div>
+      </div>
+      <div class="slabel">
+        <span>Holdings By Value</span>
+        <span class="slabel-right" id="quoteStamp">—</span>
+      </div>
+      <div id="summaryHoldings"><div class="empty">No holdings yet. Head to Add.</div></div>
+      <div class="gap"></div>
+    </div>
+  </div>
+
+  <!-- HOLDINGS PANE -->
+  <div class="pane" id="pane-holdings" style="display:none">
+    <div class="pane-inner">
+      <div class="slabel"><span>All Holdings</span><span class="slabel-right" id="holdingsCount"></span></div>
+      <div id="holdingsList"><div class="empty">No holdings yet. Head to Add.</div></div>
+      <div class="gap"></div>
+    </div>
+  </div>
+
+  <!-- ADD PANE -->
+  <div class="pane" id="pane-add" style="display:none">
+    <div class="pane-inner">
+      <div class="slabel"><span>Add Investment</span></div>
+      <div class="kind-toggle">
+        <button class="kind-btn active" id="kind-public"  onclick="setAddKind('public')">Public</button>
+        <button class="kind-btn"        id="kind-private" onclick="setAddKind('private')">Private</button>
+      </div>
+
+      <!-- PUBLIC PASTE -->
+      <div id="addPublic" style="padding:0 16px">
+        <div class="tiny" style="margin-bottom:6px">
+          Paste rows. Columns: <strong>Ticker</strong>, <strong>Shares</strong>, <strong>Cost/share</strong>, <strong>Date (YYYY-MM-DD)</strong>. Tab or comma separated. One row per lot — repeated tickers get grouped.
+        </div>
+        <div class="field">
+          <label>Rows</label>
+          <textarea class="finput" id="pasteBox" rows="9" placeholder="AAPL, 10, 150.00, 2024-01-15&#10;AAPL, 5,  175.00, 2024-06-02&#10;TSLA, 5,  200.00, 2024-02-03"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="submitPaste()">Save Lots</button>
+        <div id="pastePreview" class="tiny" style="margin-top:10px;line-height:1.7"></div>
+      </div>
+
+      <!-- PRIVATE SINGLE -->
+      <div id="addPrivate" style="padding:0 16px; display:none">
+        <div class="field">
+          <label>Name</label>
+          <input class="finput" type="text" id="privName" placeholder="Acme Robotics Inc."/>
+        </div>
+        <div class="row2">
+          <div class="field mb0">
+            <label>Amount Invested ($)</label>
+            <input class="finput" type="number" id="privAmount" placeholder="25000" inputmode="decimal" step="0.01"/>
+          </div>
+          <div class="field mb0">
+            <label>Invested Date</label>
+            <input class="finput" type="date" id="privDate"/>
+          </div>
+        </div>
+        <div class="field mt12">
+          <label>Notes (optional)</label>
+          <input class="finput" type="text" id="privNotes" placeholder="SAFE, post-money cap $10M"/>
+        </div>
+        <button class="btn btn-primary mt8" onclick="submitPrivate()">Save Investment</button>
+      </div>
+      <div class="gap"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM TAB NAV -->
+  <nav class="tabnav">
+    <div class="tabnav-inner">
+      <button class="tab-btn active" id="tab-summary"  onclick="switchTab('summary')">Summary</button>
+      <button class="tab-btn"        id="tab-holdings" onclick="switchTab('holdings')">Holdings</button>
+      <button class="tab-btn"        id="tab-add"      onclick="switchTab('add')">Add</button>
+    </div>
+  </nav>
+</div>
+
+<!-- ══════════════════ DETAIL ══════════════════ -->
+<div class="screen" id="s-detail">
+  <div class="app-header">
+    <span class="logo" id="detailTitle">—</span>
+    <button class="btn btn-ghost btn-sm" onclick="closeDetail()">← Back</button>
+  </div>
+  <div class="pane" id="detailBody"></div>
+</div>
+
+<!-- ══════════════════ MODALS ══════════════════ -->
+
+<!-- Profile / Sign out -->
+<div class="overlay" id="m-profile">
+  <div class="modal">
+    <div class="modal-top">
+      <span class="modal-title">Account</span>
+      <button class="modal-close" onclick="closeModal('m-profile')">×</button>
+    </div>
+    <div id="profEmail" class="tiny" style="margin-bottom:12px">—</div>
+    <div class="divider"></div>
+    <button class="btn btn-ghost btn-full" onclick="signOut()">Sign Out</button>
+  </div>
+</div>
+
+<!-- Add Valuation Round (private) -->
+<div class="overlay" id="m-valuation">
+  <div class="modal">
+    <div class="modal-top">
+      <span class="modal-title">Add Valuation Round</span>
+      <button class="modal-close" onclick="closeModal('m-valuation')">×</button>
+    </div>
+    <div class="row2">
+      <div class="field mb0">
+        <label>Date</label>
+        <input class="finput" type="date" id="vDate"/>
+      </div>
+      <div class="field mb0">
+        <label>Amount ($)</label>
+        <input class="finput" type="number" id="vAmount" placeholder="50000" inputmode="decimal" step="0.01"/>
+      </div>
+    </div>
+    <div class="field mt12">
+      <label>Round Name</label>
+      <input class="finput" type="text" id="vRound" placeholder="Series A · Secondary · Mark-to-market"/>
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <input class="finput" type="text" id="vNotes" placeholder="Based on latest 409A"/>
+    </div>
+    <button class="btn btn-primary mt8" onclick="saveValuation()">Save Round</button>
+  </div>
+</div>
+
+<!-- Add Invest Event (private) -->
+<div class="overlay" id="m-investevent">
+  <div class="modal">
+    <div class="modal-top">
+      <span class="modal-title">Add Invest Event</span>
+      <button class="modal-close" onclick="closeModal('m-investevent')">×</button>
+    </div>
+    <div class="row2">
+      <div class="field mb0">
+        <label>Date</label>
+        <input class="finput" type="date" id="ieDate"/>
+      </div>
+      <div class="field mb0">
+        <label>Amount ($)</label>
+        <input class="finput" type="number" id="ieAmount" placeholder="10000" inputmode="decimal" step="0.01"/>
+      </div>
+    </div>
+    <button class="btn btn-primary mt8" onclick="saveInvestEvent()">Save Event</button>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Loading...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// CONFIG — fill these in after creating your Supabase + Finnhub projects
+// ══════════════════════════════════════════════════════════
+const SUPA_URL    = 'YOUR_SUPABASE_URL';     // e.g. https://xxxx.supabase.co
+const SUPA_KEY    = 'YOUR_SUPABASE_ANON_KEY'; // anon / publishable key — RLS protects data
+const FINNHUB_KEY = 'YOUR_FINNHUB_API_KEY';
+
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let S = {
+  user:        null,
+  investments: [],   // { id, kind, ticker, name, notes }
+  lots:        [],   // { id, investment_id, shares, cost_basis_per_share, cost_basis_total, purchase_date }
+  valuations: [],    // { id, investment_id, valuation_date, valuation_amount, round_name, notes }
+  quotes:     {},    // { TICKER: { c, pc, d, dp, t } }
+  quoteStamp: null,
+  activeId:   null,  // investment id currently shown on detail page
+};
+
+let _refreshTimer = null;
+
+// ══════════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════════
+async function sendMagicLink() {
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  if (!email.includes('@')) { toast('Enter a valid email', 'err'); return; }
+  const btn = document.getElementById('btnMagic');
+  btn.disabled = true; btn.textContent = 'Sending...';
+  const { error } = await sb.auth.signInWithOtp({
+    email, options: { emailRedirectTo: window.location.href }
+  });
+  btn.disabled = false; btn.textContent = 'Send Magic Link →';
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  document.getElementById('loginMsg').textContent = '✓ Check your email — link expires in 1 hour.';
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  stopAutoRefresh();
+  S = { user:null, investments:[], lots:[], valuations:[], quotes:{}, quoteStamp:null, activeId:null };
+  closeModal('m-profile');
+  show('s-login');
+}
+
+// ══════════════════════════════════════════════════════════
+// DATA LOAD
+// ══════════════════════════════════════════════════════════
+async function loadAll() {
+  const uid = S.user.id;
+  const [inv, lots, vals] = await Promise.all([
+    sb.from('investments').select('*').eq('user_id', uid).order('created_at'),
+    sb.from('lots').select('*').eq('user_id', uid).order('purchase_date'),
+    sb.from('valuations').select('*').eq('user_id', uid).order('valuation_date'),
+  ]);
+  if (inv.error)  throw inv.error;
+  if (lots.error) throw lots.error;
+  if (vals.error) throw vals.error;
+  S.investments = inv.data  || [];
+  S.lots        = lots.data || [];
+  S.valuations  = vals.data || [];
+}
+
+// ══════════════════════════════════════════════════════════
+// FINNHUB QUOTES
+// ══════════════════════════════════════════════════════════
+async function fetchQuote(ticker) {
+  const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${FINNHUB_KEY}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  // Finnhub returns { c, d, dp, h, l, o, pc, t }. Zero on invalid symbol.
+  if (!j || !j.c) return null;
+  return j;
+}
+
+async function refreshQuotes(showToast = false) {
+  const tickers = [...new Set(S.investments
+    .filter(i => i.kind === 'public' && i.ticker)
+    .map(i => i.ticker.toUpperCase()))];
+  if (!tickers.length) { render(); return; }
+
+  const btn = document.getElementById('refreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+
+  const results = await Promise.all(tickers.map(async t => {
+    try { return [t, await fetchQuote(t)]; }
+    catch (e) { return [t, null]; }
+  }));
+  results.forEach(([t, q]) => { if (q) S.quotes[t] = q; });
+  S.quoteStamp = new Date();
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+  render();
+  if (showToast) toast('Quotes refreshed', 'ok');
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  _refreshTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') refreshQuotes(false);
+  }, 5 * 60 * 1000);
+}
+function stopAutoRefresh() {
+  if (_refreshTimer) clearInterval(_refreshTimer);
+  _refreshTimer = null;
+}
+
+// ══════════════════════════════════════════════════════════
+// METRICS
+// ══════════════════════════════════════════════════════════
+function lotsFor(invId) { return S.lots.filter(l => l.investment_id === invId); }
+function valsFor(invId) {
+  return S.valuations.filter(v => v.investment_id === invId)
+    .sort((a,b) => new Date(b.valuation_date) - new Date(a.valuation_date));
+}
+
+function posMetrics(inv) {
+  const ls = lotsFor(inv.id);
+  const total_cost = ls.reduce((a,l) => a + Number(l.cost_basis_total || 0), 0);
+
+  if (inv.kind === 'public') {
+    const shares = ls.reduce((a,l) => a + Number(l.shares || 0), 0);
+    const avg_cost = shares > 0 ? total_cost / shares : 0;
+    const q = S.quotes[(inv.ticker || '').toUpperCase()];
+    const price = q ? Number(q.c)  : 0;
+    const prev  = q ? Number(q.pc) : 0;
+    const current_value = price > 0 ? price * shares : total_cost;
+    const gain     = current_value - total_cost;
+    const gain_pct = total_cost > 0 ? (gain / total_cost) * 100 : 0;
+    const today_change = q ? (price - prev) * shares : 0;
+    const today_base   = prev * shares;
+    const today_pct    = today_base > 0 ? (today_change / today_base) * 100 : 0;
+    return { kind:'public', shares, total_cost, avg_cost, price, prev,
+             current_value, gain, gain_pct, today_change, today_pct, hasQuote: !!q, lots: ls };
+  }
+
+  const vals = valsFor(inv.id);
+  const latest = vals[0] ? Number(vals[0].valuation_amount) : total_cost;
+  const gain     = latest - total_cost;
+  const gain_pct = total_cost > 0 ? (gain / total_cost) * 100 : 0;
+  return { kind:'private', total_cost, current_value: latest,
+           gain, gain_pct, today_change: 0, today_pct: 0,
+           lots: ls, valuations: vals, latestValuation: vals[0] };
+}
+
+function totals() {
+  let invested = 0, value = 0, todayChange = 0, todayBase = 0;
+  S.investments.forEach(inv => {
+    const m = posMetrics(inv);
+    invested += m.total_cost || 0;
+    value    += m.current_value || 0;
+    if (inv.kind === 'public' && m.hasQuote) {
+      todayChange += m.today_change;
+      todayBase   += m.prev * m.shares;
+    }
+  });
+  return {
+    invested, value,
+    earnings:     value - invested,
+    earnings_pct: invested > 0 ? (value - invested) / invested * 100 : 0,
+    today_change: todayChange,
+    today_pct:    todayBase > 0 ? todayChange / todayBase * 100 : 0,
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+// FORMATTERS
+// ══════════════════════════════════════════════════════════
+function fmt$(n) {
+  const a = Math.abs(Number(n) || 0);
+  const s = a.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  return (n < 0 ? '-' : '') + '$' + s;
+}
+function fmtSigned$(n) {
+  const v = Number(n) || 0;
+  const a = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  return (v >= 0 ? '+' : '-') + '$' + a;
+}
+function fmtPct(n) {
+  const v = Number(n) || 0;
+  return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+}
+function fmtShares(n) {
+  const v = Number(n) || 0;
+  const d = Math.abs(v - Math.round(v)) < 0.0001 ? 0 : 4;
+  return v.toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d });
+}
+function dirClass(n) { return n > 0 ? 'up' : n < 0 ? 'down' : 'neut'; }
+function isoDate(d) { return d.toISOString().split('T')[0]; }
+function todayISO()  { return isoDate(new Date()); }
+
+// ══════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════
+function render() {
+  renderSummary();
+  renderHoldings();
+  if (!document.getElementById('s-detail').classList.contains('active')) return;
+  if (S.activeId) renderDetail(S.activeId);
+}
+
+function renderSummary() {
+  const t = totals();
+  document.getElementById('sumValue').textContent     = fmt$(t.value);
+  document.getElementById('sumInvested').textContent  = 'Invested: ' + fmt$(t.invested);
+
+  const earnEl = document.getElementById('sumEarn');
+  earnEl.textContent = fmtSigned$(t.earnings);
+  earnEl.className   = 'sum-big ' + dirClass(t.earnings);
+  const earnPctEl = document.getElementById('sumEarnPct');
+  earnPctEl.textContent = fmtPct(t.earnings_pct);
+  earnPctEl.className   = 'sum-sub ' + dirClass(t.earnings);
+
+  const todayEl = document.getElementById('sumToday');
+  todayEl.textContent = fmtSigned$(t.today_change);
+  todayEl.className   = 'sum-big ' + dirClass(t.today_change);
+  const todayPctEl = document.getElementById('sumTodayPct');
+  todayPctEl.textContent = fmtPct(t.today_pct);
+  todayPctEl.className   = 'sum-sub ' + dirClass(t.today_change);
+
+  const stamp = document.getElementById('quoteStamp');
+  if (S.quoteStamp) {
+    const hh = String(S.quoteStamp.getHours()).padStart(2,'0');
+    const mm = String(S.quoteStamp.getMinutes()).padStart(2,'0');
+    stamp.textContent = 'Quotes ' + hh + ':' + mm;
+  } else stamp.textContent = 'No quotes yet';
+
+  // Top 6 holdings by value
+  const sorted = [...S.investments].map(inv => ({ inv, m: posMetrics(inv) }))
+    .sort((a,b) => b.m.current_value - a.m.current_value).slice(0, 6);
+  const el = document.getElementById('summaryHoldings');
+  if (!sorted.length) { el.innerHTML = '<div class="empty">No holdings yet. Head to Add.</div>'; return; }
+  el.innerHTML = sorted.map(({ inv, m }) => holdingRowHTML(inv, m)).join('');
+}
+
+function renderHoldings() {
+  const list = [...S.investments].map(inv => ({ inv, m: posMetrics(inv) }))
+    .sort((a,b) => b.m.current_value - a.m.current_value);
+  const el = document.getElementById('holdingsList');
+  document.getElementById('holdingsCount').textContent =
+    list.length ? list.length + (list.length === 1 ? ' position' : ' positions') : '';
+  if (!list.length) { el.innerHTML = '<div class="empty">No holdings yet. Head to Add.</div>'; return; }
+  el.innerHTML = list.map(({ inv, m }) => holdingRowHTML(inv, m)).join('');
+}
+
+function holdingRowHTML(inv, m) {
+  const label = inv.kind === 'public'
+    ? (inv.ticker || '').toUpperCase()
+    : (inv.name || 'Unnamed');
+  const pill  = inv.kind === 'public' ? '' : '<span class="kind-pill priv">Private</span>';
+  const sub   = inv.kind === 'public'
+    ? `${fmtShares(m.shares)} sh · avg ${fmt$(m.avg_cost)}`
+    : (m.latestValuation ? 'Latest: ' + (m.latestValuation.round_name || 'round') : 'No valuation');
+  const gainCls  = dirClass(m.gain);
+  const chgCls   = dirClass(m.today_change);
+  const chgLine  = inv.kind === 'public' && m.hasQuote
+    ? `<div class="hrow-chg ${chgCls}">${fmtSigned$(m.today_change)} · ${fmtPct(m.today_pct)}</div>`
+    : `<div class="hrow-chg neut">${fmtPct(m.gain_pct)}</div>`;
+  return `
+    <div class="hrow" onclick="openDetail('${inv.id}')">
+      <div class="hrow-left">
+        <div class="hrow-top">
+          <span class="hrow-tick">${escapeHTML(label)}</span>
+          ${pill}
+        </div>
+        <div class="hrow-meta">${escapeHTML(sub)}</div>
+      </div>
+      <div class="hrow-right">
+        <div class="hrow-val ${gainCls}">${fmt$(m.current_value)}</div>
+        ${chgLine}
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+// DETAIL PAGE
+// ══════════════════════════════════════════════════════════
+function openDetail(id) {
+  S.activeId = id;
+  renderDetail(id);
+  show('s-detail');
+}
+function closeDetail() {
+  S.activeId = null;
+  show('s-app');
+}
+
+function renderDetail(id) {
+  const inv = S.investments.find(i => i.id === id);
+  if (!inv) { closeDetail(); return; }
+  const m = posMetrics(inv);
+  const title = inv.kind === 'public' ? (inv.ticker || '').toUpperCase() : (inv.name || 'Unnamed');
+  document.getElementById('detailTitle').textContent = title;
+  const body = document.getElementById('detailBody');
+
+  const rows = [];
+  if (inv.kind === 'public') {
+    rows.push(row('Current Price', m.hasQuote ? fmt$(m.price) : '—'));
+    rows.push(row('Avg Cost Basis', fmt$(m.avg_cost)));
+    rows.push(row('Total Shares', fmtShares(m.shares)));
+    rows.push(row('Total Cost', fmt$(m.total_cost)));
+    rows.push(row('Current Value', fmt$(m.current_value)));
+    rows.push(row('Total Gain', `<span class="${dirClass(m.gain)}">${fmtSigned$(m.gain)} · ${fmtPct(m.gain_pct)}</span>`));
+    rows.push(row("Today's Change", m.hasQuote
+      ? `<span class="${dirClass(m.today_change)}">${fmtSigned$(m.today_change)} · ${fmtPct(m.today_pct)}</span>`
+      : '—'));
+  } else {
+    rows.push(row('Total Invested', fmt$(m.total_cost)));
+    rows.push(row('Latest Valuation',
+      m.latestValuation
+        ? `${fmt$(m.current_value)} · ${escapeHTML(m.latestValuation.round_name || 'round')} · ${m.latestValuation.valuation_date}`
+        : '—'));
+    rows.push(row('Total Gain', `<span class="${dirClass(m.gain)}">${fmtSigned$(m.gain)} · ${fmtPct(m.gain_pct)}</span>`));
+  }
+
+  const hero = `
+    <div class="detail-hero">
+      <div class="tiny" style="margin-bottom:4px">${inv.kind === 'public' ? 'Public Stock' : 'Private Investment'}${inv.kind === 'public' && inv.name ? ' · ' + escapeHTML(inv.name) : ''}</div>
+      <div style="font-size:1.4rem;font-weight:500;letter-spacing:0.04em">${escapeHTML(title)}</div>
+      ${inv.notes ? `<div class="tiny" style="margin-top:6px;line-height:1.5">${escapeHTML(inv.notes)}</div>` : ''}
+    </div>
+  `;
+
+  let sections = rows.join('');
+
+  if (inv.kind === 'private') {
+    sections += `
+      <div class="slabel"><span>Valuation Rounds</span>
+        <button class="hdr-action" onclick="openValuationModal()">+ Add Round</button>
+      </div>
+      ${m.valuations.length
+        ? m.valuations.map(v => `
+            <div class="lrow">
+              <div class="lrow-date">${v.valuation_date}</div>
+              <div class="lrow-mid">
+                <div>${escapeHTML(v.round_name || 'Round')}</div>
+                ${v.notes ? `<div class="lrow-note">${escapeHTML(v.notes)}</div>` : ''}
+              </div>
+              <div class="lrow-right">${fmt$(v.valuation_amount)}</div>
+            </div>
+          `).join('')
+        : '<div class="empty">No valuation rounds yet.</div>'
+      }
+      <div class="slabel"><span>Invest Events</span>
+        <button class="hdr-action" onclick="openInvestEventModal()">+ Add Event</button>
+      </div>
+      ${m.lots.length
+        ? m.lots.slice().sort((a,b) => new Date(b.purchase_date) - new Date(a.purchase_date)).map(l => `
+            <div class="lrow">
+              <div class="lrow-date">${l.purchase_date}</div>
+              <div class="lrow-mid">Invested</div>
+              <div class="lrow-right">${fmt$(l.cost_basis_total)}</div>
+            </div>
+          `).join('')
+        : '<div class="empty">No invest events.</div>'
+      }
+    `;
+  } else {
+    sections += `
+      <div class="slabel"><span>Lots</span><span class="slabel-right">${m.lots.length}</span></div>
+      ${m.lots.length
+        ? m.lots.slice().sort((a,b) => new Date(b.purchase_date) - new Date(a.purchase_date)).map(l => `
+            <div class="lrow">
+              <div class="lrow-date">${l.purchase_date}</div>
+              <div class="lrow-mid">${fmtShares(l.shares)} sh @ ${fmt$(l.cost_basis_per_share)}</div>
+              <div class="lrow-right">${fmt$(l.cost_basis_total)}</div>
+            </div>
+          `).join('')
+        : '<div class="empty">No lots yet. Add via the Add tab.</div>'
+      }
+    `;
+  }
+
+  body.innerHTML = hero + sections + '<div class="gap"></div>';
+}
+
+function row(k, v) {
+  return `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// ADD FLOWS
+// ══════════════════════════════════════════════════════════
+let _addKind = 'public';
+function setAddKind(kind) {
+  _addKind = kind;
+  document.getElementById('kind-public').classList.toggle('active',  kind === 'public');
+  document.getElementById('kind-private').classList.toggle('active', kind === 'private');
+  document.getElementById('addPublic').style.display  = kind === 'public'  ? 'block' : 'none';
+  document.getElementById('addPrivate').style.display = kind === 'private' ? 'block' : 'none';
+}
+
+function parsePasteTable(text) {
+  const rows = [];
+  const errors = [];
+  const lines = text.trim().split(/\r?\n/);
+  lines.forEach((raw, idx) => {
+    const line = raw.trim();
+    if (!line) return;
+    let cells = line.split(/\t|,/).map(s => s.trim()).filter(Boolean);
+    if (cells.length < 4) cells = line.split(/\s+/).filter(Boolean);
+    if (cells.length < 4) { errors.push(`Line ${idx+1}: need 4 columns`); return; }
+    const [tickerRaw, sharesStr, costStr, dateStr] = cells;
+    const ticker = tickerRaw.toUpperCase();
+    // skip header rows
+    if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(ticker)) return;
+    const shares = parseFloat(sharesStr);
+    const cost   = parseFloat(costStr);
+    if (isNaN(shares) || shares <= 0) { errors.push(`Line ${idx+1}: bad shares`); return; }
+    if (isNaN(cost)   || cost   <  0) { errors.push(`Line ${idx+1}: bad cost`); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) { errors.push(`Line ${idx+1}: date must be YYYY-MM-DD`); return; }
+    rows.push({ ticker, shares, cost_per_share: cost, purchase_date: dateStr });
+  });
+  return { rows, errors };
+}
+
+async function submitPaste() {
+  const text = document.getElementById('pasteBox').value;
+  if (!text.trim()) { toast('Paste some rows first', 'err'); return; }
+  const { rows, errors } = parsePasteTable(text);
+  if (!rows.length) {
+    document.getElementById('pastePreview').innerHTML =
+      '<span class="warn">No valid rows.</span> ' + (errors.length ? errors.join(' · ') : '');
+    return;
+  }
+
+  await withLoading(async () => {
+    // Group rows by ticker
+    const byTicker = {};
+    rows.forEach(r => { (byTicker[r.ticker] = byTicker[r.ticker] || []).push(r); });
+
+    const lotInserts = [];
+    for (const ticker of Object.keys(byTicker)) {
+      let inv = S.investments.find(i => i.kind === 'public' && (i.ticker || '').toUpperCase() === ticker);
+      if (!inv) {
+        const { data, error } = await sb.from('investments').insert({
+          user_id: S.user.id, kind: 'public', ticker, name: null, notes: null,
+        }).select().single();
+        if (error) throw error;
+        inv = data;
+        S.investments.push(inv);
+      }
+      byTicker[ticker].forEach(r => {
+        lotInserts.push({
+          user_id: S.user.id,
+          investment_id: inv.id,
+          shares: r.shares,
+          cost_basis_per_share: r.cost_per_share,
+          cost_basis_total: +(r.shares * r.cost_per_share).toFixed(4),
+          purchase_date: r.purchase_date,
+        });
+      });
+    }
+
+    const { data: newLots, error: lotErr } = await sb.from('lots').insert(lotInserts).select();
+    if (lotErr) throw lotErr;
+    S.lots.push(...(newLots || []));
+
+    document.getElementById('pasteBox').value = '';
+    document.getElementById('pastePreview').innerHTML =
+      `<span class="up">Saved ${rows.length} lot${rows.length === 1 ? '' : 's'}.</span>` +
+      (errors.length ? ' Skipped: ' + errors.join(' · ') : '');
+
+    await refreshQuotes(false);
+    toast('Saved', 'ok');
+    switchTab('summary');
+  }, 'Saving lots...').catch(e => toast('Error: ' + e.message, 'err'));
+}
+
+async function submitPrivate() {
+  const name   = document.getElementById('privName').value.trim();
+  const amount = parseFloat(document.getElementById('privAmount').value);
+  const date   = document.getElementById('privDate').value;
+  const notes  = document.getElementById('privNotes').value.trim() || null;
+  if (!name)                    { toast('Enter a name', 'err'); return; }
+  if (isNaN(amount) || amount <= 0) { toast('Enter a valid amount', 'err'); return; }
+  if (!date)                    { toast('Pick an invested date', 'err'); return; }
+
+  await withLoading(async () => {
+    const { data: inv, error: iErr } = await sb.from('investments').insert({
+      user_id: S.user.id, kind: 'private', ticker: null, name, notes,
+    }).select().single();
+    if (iErr) throw iErr;
+    S.investments.push(inv);
+
+    const { data: lot, error: lErr } = await sb.from('lots').insert({
+      user_id: S.user.id, investment_id: inv.id,
+      shares: null, cost_basis_per_share: null,
+      cost_basis_total: amount, purchase_date: date,
+    }).select().single();
+    if (lErr) throw lErr;
+    S.lots.push(lot);
+
+    ['privName','privAmount','privDate','privNotes'].forEach(id => document.getElementById(id).value = '');
+    toast('Investment saved', 'ok');
+    openDetail(inv.id);
+  }, 'Saving investment...').catch(e => toast('Error: ' + e.message, 'err'));
+}
+
+// ══════════════════════════════════════════════════════════
+// VALUATION / INVEST EVENT MODALS
+// ══════════════════════════════════════════════════════════
+function openValuationModal() {
+  document.getElementById('vDate').value   = todayISO();
+  document.getElementById('vAmount').value = '';
+  document.getElementById('vRound').value  = '';
+  document.getElementById('vNotes').value  = '';
+  openModal('m-valuation');
+}
+
+async function saveValuation() {
+  const date   = document.getElementById('vDate').value;
+  const amount = parseFloat(document.getElementById('vAmount').value);
+  const round  = document.getElementById('vRound').value.trim() || null;
+  const notes  = document.getElementById('vNotes').value.trim() || null;
+  if (!date)                    { toast('Pick a date', 'err'); return; }
+  if (isNaN(amount) || amount <= 0) { toast('Enter a valid amount', 'err'); return; }
+  if (!S.activeId)              { toast('No investment selected', 'err'); return; }
+
+  await withLoading(async () => {
+    const { data, error } = await sb.from('valuations').insert({
+      user_id: S.user.id, investment_id: S.activeId,
+      valuation_date: date, valuation_amount: amount,
+      round_name: round, notes,
+    }).select().single();
+    if (error) throw error;
+    S.valuations.push(data);
+    closeModal('m-valuation');
+    renderDetail(S.activeId);
+    renderSummary(); renderHoldings();
+    toast('Round added', 'ok');
+  }, 'Saving round...').catch(e => toast('Error: ' + e.message, 'err'));
+}
+
+function openInvestEventModal() {
+  document.getElementById('ieDate').value   = todayISO();
+  document.getElementById('ieAmount').value = '';
+  openModal('m-investevent');
+}
+
+async function saveInvestEvent() {
+  const date   = document.getElementById('ieDate').value;
+  const amount = parseFloat(document.getElementById('ieAmount').value);
+  if (!date)                    { toast('Pick a date', 'err'); return; }
+  if (isNaN(amount) || amount <= 0) { toast('Enter a valid amount', 'err'); return; }
+  if (!S.activeId)              { toast('No investment selected', 'err'); return; }
+
+  await withLoading(async () => {
+    const { data, error } = await sb.from('lots').insert({
+      user_id: S.user.id, investment_id: S.activeId,
+      shares: null, cost_basis_per_share: null,
+      cost_basis_total: amount, purchase_date: date,
+    }).select().single();
+    if (error) throw error;
+    S.lots.push(data);
+    closeModal('m-investevent');
+    renderDetail(S.activeId);
+    renderSummary(); renderHoldings();
+    toast('Event added', 'ok');
+  }, 'Saving event...').catch(e => toast('Error: ' + e.message, 'err'));
+}
+
+// ══════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+
+function switchTab(name) {
+  ['summary','holdings','add'].forEach(t => {
+    document.getElementById('pane-' + t).style.display = t === name ? 'block' : 'none';
+    document.getElementById('tab-'  + t)?.classList.toggle('active', t === name);
+  });
+  if (name === 'summary')  renderSummary();
+  if (name === 'holdings') renderHoldings();
+}
+
+function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
+function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+function escapeHTML(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+}
+
+function updateHeader() {
+  const email = S.user?.email || '—';
+  document.getElementById('hdrUser').textContent = email.split('@')[0].toUpperCase().slice(0, 10);
+  document.getElementById('profEmail').textContent = 'Signed in as ' + email;
+}
+
+let _loadTimer = null;
+function showLoading(msg = 'Loading...') {
+  const el = document.getElementById('loadingOverlay');
+  el.querySelector('.loading-text').textContent = msg;
+  _loadTimer = setTimeout(() => el.classList.add('active'), 200);
+}
+function hideLoading() {
+  clearTimeout(_loadTimer);
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+async function withLoading(fn, msg) {
+  showLoading(msg);
+  try { return await fn(); } finally { hideLoading(); }
+}
+
+let _tt;
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  clearTimeout(_tt); _tt = setTimeout(() => { t.className = 'toast'; }, 2600);
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+async function enterApp() {
+  await loadAll();
+  render();
+  updateHeader();
+  show('s-app');
+  switchTab('summary');
+  await refreshQuotes(false);
+  startAutoRefresh();
+}
+
+(async () => {
+  showLoading('Loading...');
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    S.user = session.user;
+    try { await enterApp(); }
+    catch (e) { toast('Load error: ' + e.message, 'err'); }
+    hideLoading();
+  } else {
+    hideLoading();
+    show('s-login');
+  }
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+      showLoading('Loading...');
+      S.user = session.user;
+      try { await enterApp(); }
+      catch (e) { toast('Load error: ' + e.message, 'err'); }
+      hideLoading();
+    }
+    if (event === 'SIGNED_OUT') { show('s-login'); }
+  });
+})();
+</script>
+</body>
+</html>
