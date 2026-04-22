@@ -127,18 +127,20 @@
 
     /* HOLDING ROW */
     .hrow {
-      display:flex; padding:12px 16px; border-bottom:1px solid var(--border);
-      cursor:pointer; gap:10px; align-items:center;
+      display:flex; padding:14px 16px; border-bottom:1px solid var(--border);
+      cursor:pointer; gap:10px; align-items:flex-start;
     }
     .hrow:hover { background:var(--surface); }
     .hrow-left { flex:1; min-width:0; }
     .hrow-top  { display:flex; align-items:baseline; gap:8px; }
-    .hrow-tick { font-size:0.85rem; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; }
+    .hrow-tick { font-size:0.95rem; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; }
     .hrow-name { font-size:0.62rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .hrow-meta { font-size:0.6rem; color:var(--muted2); margin-top:2px; }
-    .hrow-right { text-align:right; }
+    .hrow-meta { font-size:0.62rem; color:var(--muted2); margin-top:3px; }
+    .hrow-sub  { font-size:0.62rem; margin-top:4px; letter-spacing:0.02em; }
+    .hrow-right { text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
+    .hrow-big   { font-size:1.0rem; font-weight:500; letter-spacing:0.02em; }
     .hrow-val   { font-size:0.85rem; font-weight:500; }
-    .hrow-chg   { font-size:0.6rem; margin-top:2px; }
+    .hrow-chg   { font-size:0.62rem; margin-top:2px; }
     .kind-pill  {
       display:inline-block; font-size:0.5rem; letter-spacing:0.14em; text-transform:uppercase;
       color:var(--muted2); border:1px solid var(--border2); padding:1px 5px; border-radius:1px;
@@ -264,42 +266,36 @@
     </span>
   </div>
 
-  <!-- SUMMARY PANE -->
-  <div class="pane" id="pane-summary">
+  <!-- HOME PANE — Total Return -->
+  <div class="pane" id="pane-home">
     <div class="pane-inner">
       <div class="sum-wrap">
         <div class="sum-hero">
-          <div class="sum-label">Current Value</div>
-          <div class="sum-big" id="sumValue">$0.00</div>
-          <div class="sum-sub" id="sumInvested">Invested: $0.00</div>
-        </div>
-        <div class="sum-row2">
-          <div class="sum-tile">
-            <div class="sum-label">Total Earnings</div>
-            <div class="sum-big" id="sumEarn">$0.00</div>
-            <div class="sum-sub" id="sumEarnPct">+0.00%</div>
-          </div>
-          <div class="sum-tile">
-            <div class="sum-label">Today's Change</div>
-            <div class="sum-big" id="sumToday">$0.00</div>
-            <div class="sum-sub" id="sumTodayPct">+0.00%</div>
-          </div>
+          <div class="sum-label">Total Return</div>
+          <div class="sum-big" id="homeGain">$0.00</div>
+          <div class="sum-sub" id="homeGainPct">+0.00%</div>
+          <div class="sum-sub mt12" id="homeMeta" style="color:var(--muted)">Invested $0 · Value $0</div>
         </div>
       </div>
-      <div class="slabel">
-        <span>Holdings By Value</span>
-        <span class="slabel-right" id="quoteStamp">—</span>
-      </div>
-      <div id="summaryHoldings"><div class="empty">No holdings yet. Head to Add.</div></div>
+      <div class="slabel"><span>Holdings By Gain</span><span class="slabel-right" id="homeCount"></span></div>
+      <div id="homeList"><div class="empty">No holdings yet. Head to Add.</div></div>
       <div class="gap"></div>
     </div>
   </div>
 
-  <!-- HOLDINGS PANE -->
-  <div class="pane" id="pane-holdings" style="display:none">
+  <!-- TODAY PANE — Day Movement -->
+  <div class="pane" id="pane-today" style="display:none">
     <div class="pane-inner">
-      <div class="slabel"><span>All Holdings</span><span class="slabel-right" id="holdingsCount"></span></div>
-      <div id="holdingsList"><div class="empty">No holdings yet. Head to Add.</div></div>
+      <div class="sum-wrap">
+        <div class="sum-hero">
+          <div class="sum-label">Today's Change</div>
+          <div class="sum-big" id="todayBig">$0.00</div>
+          <div class="sum-sub" id="todayPctBig">+0.00%</div>
+          <div class="sum-sub mt12" id="todayStamp" style="color:var(--muted)">No quotes yet</div>
+        </div>
+      </div>
+      <div class="slabel"><span>Today's Movement</span></div>
+      <div id="todayList"><div class="empty">No public holdings with quotes yet.</div></div>
       <div class="gap"></div>
     </div>
   </div>
@@ -363,9 +359,9 @@
   <!-- BOTTOM TAB NAV -->
   <nav class="tabnav">
     <div class="tabnav-inner">
-      <button class="tab-btn active" id="tab-summary"  onclick="switchTab('summary')">Summary</button>
-      <button class="tab-btn"        id="tab-holdings" onclick="switchTab('holdings')">Holdings</button>
-      <button class="tab-btn"        id="tab-add"      onclick="switchTab('add')">Add</button>
+      <button class="tab-btn active" id="tab-home"  onclick="switchTab('home')">Home</button>
+      <button class="tab-btn"        id="tab-today" onclick="switchTab('today')">Today</button>
+      <button class="tab-btn"        id="tab-add"   onclick="switchTab('add')">Add</button>
     </div>
   </nav>
 </div>
@@ -656,69 +652,46 @@ function todayISO()  { return isoDate(new Date()); }
 // RENDER
 // ══════════════════════════════════════════════════════════
 function render() {
-  renderSummary();
-  renderHoldings();
+  renderHome();
+  renderToday();
   if (!document.getElementById('s-detail').classList.contains('active')) return;
   if (S.activeId) renderDetail(S.activeId);
 }
 
-function renderSummary() {
+function renderHome() {
   const t = totals();
-  document.getElementById('sumValue').textContent     = fmt$(t.value);
-  document.getElementById('sumInvested').textContent  = 'Invested: ' + fmt$(t.invested);
+  const gainEl = document.getElementById('homeGain');
+  gainEl.textContent = fmtSigned$(t.earnings);
+  gainEl.className   = 'sum-big ' + dirClass(t.earnings);
+  const gainPctEl = document.getElementById('homeGainPct');
+  gainPctEl.textContent = fmtPct(t.earnings_pct);
+  gainPctEl.className   = 'sum-sub ' + dirClass(t.earnings);
+  document.getElementById('homeMeta').textContent =
+    `Invested ${fmt$(t.invested)} · Value ${fmt$(t.value)}`;
 
-  const earnEl = document.getElementById('sumEarn');
-  earnEl.textContent = fmtSigned$(t.earnings);
-  earnEl.className   = 'sum-big ' + dirClass(t.earnings);
-  const earnPctEl = document.getElementById('sumEarnPct');
-  earnPctEl.textContent = fmtPct(t.earnings_pct);
-  earnPctEl.className   = 'sum-sub ' + dirClass(t.earnings);
-
-  const todayEl = document.getElementById('sumToday');
-  todayEl.textContent = fmtSigned$(t.today_change);
-  todayEl.className   = 'sum-big ' + dirClass(t.today_change);
-  const todayPctEl = document.getElementById('sumTodayPct');
-  todayPctEl.textContent = fmtPct(t.today_pct);
-  todayPctEl.className   = 'sum-sub ' + dirClass(t.today_change);
-
-  const stamp = document.getElementById('quoteStamp');
-  if (S.quoteStamp) {
-    const hh = String(S.quoteStamp.getHours()).padStart(2,'0');
-    const mm = String(S.quoteStamp.getMinutes()).padStart(2,'0');
-    stamp.textContent = 'Quotes ' + hh + ':' + mm;
-  } else stamp.textContent = 'No quotes yet';
-
-  // Top 6 holdings by value
-  const sorted = [...S.investments].map(inv => ({ inv, m: posMetrics(inv) }))
-    .sort((a,b) => b.m.current_value - a.m.current_value).slice(0, 6);
-  const el = document.getElementById('summaryHoldings');
-  if (!sorted.length) { el.innerHTML = '<div class="empty">No holdings yet. Head to Add.</div>'; return; }
-  el.innerHTML = sorted.map(({ inv, m }) => holdingRowHTML(inv, m)).join('');
-}
-
-function renderHoldings() {
   const list = [...S.investments].map(inv => ({ inv, m: posMetrics(inv) }))
-    .sort((a,b) => b.m.current_value - a.m.current_value);
-  const el = document.getElementById('holdingsList');
-  document.getElementById('holdingsCount').textContent =
-    list.length ? list.length + (list.length === 1 ? ' position' : ' positions') : '';
+    .sort((a, b) => b.m.gain - a.m.gain);
+  document.getElementById('homeCount').textContent =
+    list.length ? list.length + (list.length === 1 ? ' pos' : ' pos') : '';
+  const el = document.getElementById('homeList');
   if (!list.length) { el.innerHTML = '<div class="empty">No holdings yet. Head to Add.</div>'; return; }
-  el.innerHTML = list.map(({ inv, m }) => holdingRowHTML(inv, m)).join('');
+  el.innerHTML = list.map(({ inv, m }) => gainRowHTML(inv, m)).join('');
 }
 
-function holdingRowHTML(inv, m) {
+function gainRowHTML(inv, m) {
   const label = inv.kind === 'public'
     ? (inv.ticker || '').toUpperCase()
     : (inv.name || 'Unnamed');
   const pill  = inv.kind === 'public' ? '' : '<span class="kind-pill priv">Private</span>';
-  const sub   = inv.kind === 'public'
-    ? `${fmtShares(m.shares)} sh · avg ${fmt$(m.avg_cost)}`
-    : (m.latestValuation ? 'Latest: ' + (m.latestValuation.round_name || 'round') : 'No valuation');
-  const gainCls  = dirClass(m.gain);
-  const chgCls   = dirClass(m.today_change);
-  const chgLine  = inv.kind === 'public' && m.hasQuote
-    ? `<div class="hrow-chg ${chgCls}">${fmtSigned$(m.today_change)} · ${fmtPct(m.today_pct)}</div>`
-    : `<div class="hrow-chg neut">${fmtPct(m.gain_pct)}</div>`;
+  const metaLeft = inv.kind === 'public'
+    ? `${fmtShares(m.shares)} sh`
+    : (m.latestValuation ? (m.latestValuation.round_name || 'valuation') : 'no valuation');
+  const priceVsBasis = inv.kind === 'public'
+    ? (m.hasQuote
+        ? `${fmt$(m.price)} now · avg ${fmt$(m.avg_cost)}`
+        : `avg ${fmt$(m.avg_cost)}`)
+    : `${fmt$(m.current_value)} now · invested ${fmt$(m.total_cost)}`;
+  const cls = dirClass(m.gain);
   return `
     <div class="hrow" onclick="openDetail('${inv.id}')">
       <div class="hrow-left">
@@ -726,11 +699,62 @@ function holdingRowHTML(inv, m) {
           <span class="hrow-tick">${escapeHTML(label)}</span>
           ${pill}
         </div>
-        <div class="hrow-meta">${escapeHTML(sub)}</div>
+        <div class="hrow-meta">${escapeHTML(metaLeft)}</div>
+        <div class="hrow-sub ${cls}">${escapeHTML(priceVsBasis)}</div>
       </div>
       <div class="hrow-right">
-        <div class="hrow-val ${gainCls}">${fmt$(m.current_value)}</div>
-        ${chgLine}
+        <div class="hrow-big ${cls}">${fmtSigned$(m.gain)}</div>
+        <div class="hrow-chg ${cls}">${fmtPct(m.gain_pct)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderToday() {
+  const t = totals();
+  const bigEl = document.getElementById('todayBig');
+  bigEl.textContent = fmtSigned$(t.today_change);
+  bigEl.className   = 'sum-big ' + dirClass(t.today_change);
+  const pctEl = document.getElementById('todayPctBig');
+  pctEl.textContent = fmtPct(t.today_pct);
+  pctEl.className   = 'sum-sub ' + dirClass(t.today_change);
+
+  const stamp = document.getElementById('todayStamp');
+  if (S.quoteStamp) {
+    const hh = String(S.quoteStamp.getHours()).padStart(2, '0');
+    const mm = String(S.quoteStamp.getMinutes()).padStart(2, '0');
+    stamp.textContent = 'Quotes ' + hh + ':' + mm;
+  } else stamp.textContent = 'No quotes yet';
+
+  const list = S.investments
+    .filter(i => i.kind === 'public')
+    .map(inv => ({ inv, m: posMetrics(inv) }))
+    .filter(x => x.m.hasQuote)
+    .sort((a, b) => Math.abs(b.m.today_change) - Math.abs(a.m.today_change));
+  const el = document.getElementById('todayList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">No public holdings with quotes yet.</div>';
+    return;
+  }
+  el.innerHTML = list.map(({ inv, m }) => todayRowHTML(inv, m)).join('');
+}
+
+function todayRowHTML(inv, m) {
+  const label = (inv.ticker || '').toUpperCase();
+  const cls   = dirClass(m.today_change);
+  const arrow = m.price >= m.prev ? '→' : '→';
+  return `
+    <div class="hrow" onclick="openDetail('${inv.id}')">
+      <div class="hrow-left">
+        <div class="hrow-top">
+          <span class="hrow-tick">${escapeHTML(label)}</span>
+        </div>
+        <div class="hrow-meta">${fmtShares(m.shares)} sh</div>
+        <div class="hrow-sub ${cls}">${fmt$(m.prev)} ${arrow} ${fmt$(m.price)}</div>
+      </div>
+      <div class="hrow-right">
+        <div class="hrow-big ${cls}">${fmtSigned$(m.today_change)}</div>
+        <div class="hrow-chg ${cls}">${fmtPct(m.today_pct)}</div>
       </div>
     </div>
   `;
@@ -1076,7 +1100,7 @@ async function submitPaste() {
 
     await refreshQuotes(false);
     toast('Saved', 'ok');
-    switchTab('summary');
+    switchTab('home');
   }, 'Saving lots...').catch(e => toast('Error: ' + e.message, 'err'));
 }
 
@@ -1140,7 +1164,7 @@ async function saveValuation() {
     S.valuations.push(data);
     closeModal('m-valuation');
     renderDetail(S.activeId);
-    renderSummary(); renderHoldings();
+    renderHome(); renderToday();
     toast('Round added', 'ok');
   }, 'Saving round...').catch(e => toast('Error: ' + e.message, 'err'));
 }
@@ -1168,7 +1192,7 @@ async function saveInvestEvent() {
     S.lots.push(data);
     closeModal('m-investevent');
     renderDetail(S.activeId);
-    renderSummary(); renderHoldings();
+    renderHome(); renderToday();
     toast('Event added', 'ok');
   }, 'Saving event...').catch(e => toast('Error: ' + e.message, 'err'));
 }
@@ -1182,12 +1206,12 @@ function show(id) {
 }
 
 function switchTab(name) {
-  ['summary','holdings','add'].forEach(t => {
+  ['home','today','add'].forEach(t => {
     document.getElementById('pane-' + t).style.display = t === name ? 'block' : 'none';
     document.getElementById('tab-'  + t)?.classList.toggle('active', t === name);
   });
-  if (name === 'summary')  renderSummary();
-  if (name === 'holdings') renderHoldings();
+  if (name === 'home')  renderHome();
+  if (name === 'today') renderToday();
 }
 
 function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
@@ -1238,7 +1262,7 @@ async function enterApp() {
   render();
   updateHeader();
   show('s-app');
-  switchTab('summary');
+  switchTab('home');
   await refreshQuotes(false);
   startAutoRefresh();
 }
